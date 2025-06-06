@@ -23,7 +23,7 @@ contract Auction {
     
     StructOfferAccount[] offerRegistry;
 
-    struct auxStructResult{
+    struct AuxStructResult{
         address account;
         uint256 amount;
         bool auctionEnded;
@@ -46,10 +46,11 @@ contract Auction {
         offers[msg.sender] = _offer;
     }
 
-    event newOfferEvent(address account, uint256 offer, uint256 timestamp);
-    event endAuctionEvent(address topAccount, uint256 topOffer, uint256 timestamp);
+    event NewOfferEvent(address account, uint256 offer, uint256 timestamp);
+    event EndAuctionEvent(address topAccount, uint256 topOffer, uint256 timestamp);
+    
     //Not required, added for completeness
-    event endDateExtension(uint256 newEndDate);
+    event EndDateExtension(uint256 newEndDate);
 
     
     //Check the status of the auction before the offer.
@@ -77,14 +78,14 @@ contract Auction {
 
     //If a new valid offer is placed within the last 10 minutes, the auction period is extended by 10 minutes.
     modifier checkLastTimeBid(){
-        if(block.timestamp >= endDateAuction - 10 seconds){
-            endDateAuction += 10 seconds;
-            emit endDateExtension(endDateAuction);
+        if(block.timestamp >= endDateAuction - 10 minutes){
+            endDateAuction += 10 minutes;
+            emit EndDateExtension(endDateAuction);
         }
         _;
     }
 
-    function CreateOffer() external payable chkAuctionIsActive goodBid checkLastTimeBid {
+    function createOffer() external payable chkAuctionIsActive goodBid checkLastTimeBid {
         topOfferAccount = msg.sender;
         topOffer = msg.value;
         offers[msg.sender] = msg.value;
@@ -94,11 +95,11 @@ contract Auction {
             amount: msg.value
         });
         offerRegistry.push(auxInfo);
-        emit newOfferEvent(msg.sender, msg.value, block.timestamp);
+        emit NewOfferEvent(msg.sender, msg.value, block.timestamp);
     }
 
-    function ShowAuctionWinner() public view returns (auxStructResult memory){
-        auxStructResult memory auxResult = auxStructResult({
+    function showAuctionWinner() public view returns (AuxStructResult memory){
+        AuxStructResult memory auxResult = AuxStructResult({
             account: topOfferAccount,
             amount: topOffer,
             auctionEnded: auctionClosed
@@ -106,18 +107,18 @@ contract Auction {
         return auxResult;
     }
 
-    function ShowAuctionOffers() public view returns (StructOfferAccount[] memory){
+    function showAuctionOffers() public view returns (StructOfferAccount[] memory){
         return offerRegistry;
     }
 
-    function EndAuction() external onlyOwner {
+    function endAuction() external onlyOwner {
         require(block.timestamp > endDateAuction, "You can't end the auction before the stablished end date.");
         require(!auctionClosed, "The auction is already closed.");
         auctionClosed = true;
-        emit endAuctionEvent(topOfferAccount, topOffer, block.timestamp);
+        emit EndAuctionEvent(topOfferAccount, topOffer, block.timestamp);
     }
 
-    //Refund, for complete refund amount should be 0.
+    //Refund, add amount for parcial refund and for complete refund amount should be 0.
     function refund(uint256 amount) public {
         require(offers[msg.sender] > 0,"Insufficient balance.");
         require(msg.sender != topOfferAccount, "You can't withdraw the winning bid");
@@ -137,11 +138,9 @@ contract Auction {
         require(comSent, "Failed to send commission");
     }
 
-
-    //Added for experimental purposes: Owner hability to refund 
+    //Added for experimental purposes (not required): Owner hability to refund 
     function refundAll() external onlyOwner {
         require(auctionClosed,"Auction still active.");
-        
         for (uint256 i=0; i < offerRegistry.length; i++) {
             address account = offerRegistry[i].account;
             if(account == topOfferAccount || offers[account] == 0 || processed[account]){
